@@ -1,0 +1,209 @@
+import os
+import re
+import io
+import asyncio
+import logging
+from datetime import datetime, timedelta
+import aiohttp
+import discord
+from discord.ext import commands
+from PIL import Image
+import pytesseract
+import dateparser
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("demolition-bot")
+
+# --- CONFIG ---
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")  # Set in Replit secrets
+WATCH_CHANNEL_ID = int(os.getenv("WATCH_CHANNEL_ID") or "0")  # 0 = watch all channels
+TIMEZONE = os.getenv("TIMEZONE") or "Europe/London"
+OCR_SPACE_API_KEY = os.getenv("OCR_SPACE_API_KEY")  # Optional fallback OCR.space key
+REMINDER_OFFSETS = [3, 1]  # hours before demolition
+CONFIRM_TIMEOUT = 120  # seconds to wait for confirmation reaction
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.messages = True
+intents.guilds = True
+intents.reactions = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# --- OCR Helpers ---
+def ocr_pytesseract_bytes(image_bytes):
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        text = pytesseract.image_to_string(img)
+        return text
+    except Exception as e:
+        log.exception("pytesseract failed: %s", e)
+        return ""
+
+async def ocr_space_bytes(image_bytes):
+    if not OCR_SPACE_API_KEY:
+        return ""
+    url = "https://api.ocr.space/parse/image"
+    async with aiohttp.ClientSession() as session:
+        form = aiohttp.FormData()
+        form.add_field("apikey", OCR_SPACE_API_KEY)
+        form.add_field("language", "eng")
+        form.add_field("file", image_bytes, filename="upload.png", content_type="image/png")
+        async with session.post(url, data=form) as resp:
+            res = await resp.json()
+            if res.get("IsErroredOnProcessing"):
+                log.warning("OCR.space error: %s", res)
+                return ""
+            parsed = res.get("ParsedResults", [])
+            texts = [p.get("ParsedText", "") for p in parsed]
+            return "\n".join(texts)
+
+# --- Date Extraction ---
+def extract_datetime_from_text(text):
+    if not text or text.strip() == "":
+        return None, "No text found."
+
+    if not re.search(r"miss(ed)?\s*payment", text, re.I) or not re.search(r"demol", text, re.I):
+        return None, "Key phrases not found."
+
+    candidates = []
+    for line in re.split(r"[\r\n]+", text):
+        if re.search(r"\d{1,2}[:.]\d{2}", line) or re.search(r"\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}", line):
+            candidates.append(line.strip())
+
+    if not candidates:
+        candidates = [text]
+
+    for cand in candidates:
+        settings = {"TIMEZONE": TIMEZONE, "RETURN_AS_TIMEZONE_AWARE": False}
+        times = re.findall(r"\d{1,2}[:.]\d{2}", cand)
+        dates = re.findall(r"\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}|\d{1,2}\s+\w+\s+\d{4}|\w+\s+\d{1,2},\s*\d{4}", cand)
+        if dates and times:
+            combined = f"{dates[-1]} {times[-1]}"
+            parsed = dateparser.parse(combined, settings=settings)
+            if parsed:
+                return parsed, cand
+        parsed = dateparser.parse(cand, settings=settings)
+        if parsed:
+            return parsed, cand
+
+    parsed = dateparser.parse(text, settings={"TIMEZONE": TIMEZONE, "RETURN_AS_TIMEZONE_AWARE": False})
+    if parsed:
+        return parsed, text
+
+    return None, "Could not detect a datetime."
+
+# --- Scheduling ---
+async def schedule_reminder(channel, demolition_dt, offset_hours):
+    remind_time = demolition_dt - timedelta(hours=offset_hours)
+    now = datetime.now()
+    delay = (remind_time - now).total_seconds()
+    if delay <= 0:
+        return False, f"{offset_hours}h reminder time ({remind_time}) already passed."
+
+    async def waiter():
+        log.info(f"Scheduling {offset_hours}h reminder in {delay} seconds for {remind_time}")
+        await asyncio.sleep(delay)
+        fmt_time = demolition_dt.strftime("%H:%M, %d %b %Y")
+        try:
+            await channel.send(f"⏰ Reminder: demolition at **{fmt_time}** — {offset_hours} hour(s) remaining.")
+        except Exception as e:
+            log.exception("Failed to send reminder: %s", e)
+
+    asyncio.create_task(waiter())
+    return True, f"{offset_hours}h reminder scheduled for {remind_time.strftime('%Y-%m-%d %H:%M:%S')}"
+
+# --- Process Image ---
+async def process_image_bytes(channel, image_bytes, author):
+    text = ocr_pytesseract_bytes(image_bytes)
+    if not text.strip() and OCR_SPACE_API_KEY:
+        log.info("pytesseract empty, using OCR.space fallback")
+        text = await ocr_space_bytes(image_bytes)
+
+    parsed_dt, source = extract_datetime_from_text(text)
+    if not parsed_dt:
+        await channel.send("⚠️ This image doesn’t contain demolition information.\nNo reminder was created.")
+        return
+
+    demolition_dt = parsed_dt
+    fmt_time = demolition_dt.strftime("%H:%M, %d %b %Y")
+    msg = await channel.send(
+        f"Detected demolition at **{fmt_time}** (from `{source}`).\nReact ✅ to confirm and set reminders, ❌ to cancel."
+    )
+
+    await msg.add_reaction("✅")
+    await msg.add_reaction("❌")
+
+    def check(reaction, user):
+        return (
+            user == author
+            and reaction.message.id == msg.id
+            and str(reaction.emoji) in ["✅", "❌"]
+        )
+
+    try:
+        reaction, user = await bot.wait_for("reaction_add", timeout=CONFIRM_TIMEOUT, check=check)
+    except asyncio.TimeoutError:
+        await channel.send("⌛ Confirmation timeout. No reminder was set.")
+        return
+
+    if str(reaction.emoji) == "❌":
+        await channel.send("❌ Confirmation canceled. No reminder was set.")
+        return
+
+    results = []
+    for off in REMINDER_OFFSETS:
+        ok, m = await schedule_reminder(channel, demolition_dt, off)
+        results.append((ok, m))
+
+    summary_lines = []
+    for ok, m in results:
+        summary_lines.append(("✅ " if ok else "⚠️ ") + m)
+    await channel.send("\n".join(summary_lines))
+
+# --- Commands ---
+@bot.command(name="demolition", help="Attach an image containing demolition time.")
+async def cmd_demolition(ctx):
+    if not ctx.message.attachments:
+        await ctx.send("Please attach an image containing the demolition notice.")
+        return
+    att = ctx.message.attachments[0]
+    if not att.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+        await ctx.send("Please attach a PNG or JPG image.")
+        return
+    async with aiohttp.ClientSession() as session:
+        async with session.get(att.url) as resp:
+            image_bytes = await resp.read()
+    await process_image_bytes(ctx.channel, image_bytes, ctx.author)
+
+# Optional: auto-process any message in WATCH_CHANNEL_ID containing image + keywords
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+    if WATCH_CHANNEL_ID and WATCH_CHANNEL_ID != 0:
+        if not message.channel or message.channel.id != WATCH_CHANNEL_ID:
+            await bot.process_commands(message)
+            return
+    if message.attachments and re.search(r"\bdemol|miss(ed)?\s*payment|missed payment\b", (message.content or ""), re.I):
+        att = message.attachments[0]
+        if att.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+            async with aiohttp.ClientSession() as session:
+                async with session.get(att.url) as resp:
+                    image_bytes = await resp.read()
+            await process_image_bytes(message.channel, image_bytes, message.author)
+            return
+    await bot.process_commands(message)
+
+# Startup
+@bot.event
+async def on_ready():
+    log.info(f"Logged in as {bot.user} (id: {bot.user.id})")
+    log.info("Ready to process images.")
+    print(f"Ready. Timezone: {TIMEZONE}")
+
+if __name__ == "__main__":
+    if not DISCORD_TOKEN:
+        print("Error: DISCORD_TOKEN not set as environment variable.")
+        exit(1)
+    bot.run(DISCORD_TOKEN)
