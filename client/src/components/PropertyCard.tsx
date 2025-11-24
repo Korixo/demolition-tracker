@@ -1,0 +1,107 @@
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Building2, Clock, Navigation, AlertCircle } from "lucide-react";
+import { formatDistanceToNow, format, differenceInHours } from "date-fns";
+
+interface PropertyCardProps {
+  id: string;
+  ownerName?: string;
+  buildingName: string;
+  demolitionDate: Date;
+  status: "pending" | "confirmed" | "reminded" | "completed";
+  imageUrl?: string;
+  onNavigate?: (id: string) => void;
+}
+
+export default function PropertyCard({
+  id,
+  ownerName,
+  buildingName,
+  demolitionDate,
+  status,
+  imageUrl,
+  onNavigate,
+}: PropertyCardProps) {
+  const isPast = demolitionDate < new Date();
+  const hoursUntil = differenceInHours(demolitionDate, new Date());
+  const isUrgent = hoursUntil <= 24 && hoursUntil > 0;
+  const timeUntil = isPast ? "OVERDUE" : formatDistanceToNow(demolitionDate, { addSuffix: true });
+
+  const statusConfig = {
+    pending: { color: "bg-amber-500/20 text-amber-400 border-amber-500/30", label: "Pending" },
+    confirmed: { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", label: "Confirmed" },
+    reminded: { color: "bg-purple-500/20 text-purple-400 border-purple-500/30", label: "Reminded" },
+    completed: { color: "bg-green-500/20 text-green-400 border-green-500/30", label: "Completed" },
+  };
+
+  return (
+    <Card 
+      className={`overflow-hidden hover-elevate transition-all ${
+        isUrgent ? 'border-destructive/50 shadow-lg shadow-destructive/20 animate-pulse' : ''
+      } ${isPast && status !== 'completed' ? 'border-destructive' : ''}`}
+      data-testid={`card-property-${id}`}
+    >
+      <CardContent className="p-4 space-y-3">
+        {isUrgent && (
+          <div className="flex items-center gap-2 text-destructive text-sm font-medium">
+            <AlertCircle className="h-4 w-4" />
+            <span>DEMOLITION IMMINENT</span>
+          </div>
+        )}
+
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
+              <Building2 className="h-3 w-3" />
+              <span>Building</span>
+            </div>
+            <h3 className="text-lg font-semibold truncate" data-testid={`text-building-${id}`}>
+              {buildingName}
+            </h3>
+            {ownerName && (
+              <div className="text-sm text-muted-foreground">
+                Owner: {ownerName}
+              </div>
+            )}
+          </div>
+          <Badge className={statusConfig[status].color} data-testid={`badge-status-${id}`}>
+            {statusConfig[status].label}
+          </Badge>
+        </div>
+
+        <div className="space-y-2 pt-2 border-t border-border/50">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Demolition Date:</span>
+            <span className="font-medium font-mono" data-testid={`text-date-${id}`}>
+              {format(demolitionDate, "MMM dd, HH:mm")}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className={`text-sm font-medium ${
+              isPast ? 'text-destructive' : isUrgent ? 'text-amber-400' : 'text-muted-foreground'
+            }`} data-testid={`text-countdown-${id}`}>
+              {timeUntil}
+            </span>
+          </div>
+        </div>
+
+        {(isUrgent || isPast) && (
+          <Button
+            className="w-full"
+            variant={isPast ? "destructive" : "default"}
+            onClick={() => {
+              onNavigate?.(id);
+              console.log('Navigate to property:', id);
+            }}
+            data-testid={`button-navigate-${id}`}
+          >
+            <Navigation className="h-4 w-4 mr-2" />
+            Go to Property
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
