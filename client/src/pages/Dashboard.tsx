@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import QuickStats from "@/components/QuickStats";
 import UploadZone from "@/components/UploadZone";
@@ -62,8 +63,12 @@ const mockProperties: Array<{
 ];
 
 export default function Dashboard() {
+  const { toast } = useToast();
+  const [properties, setProperties] = useState(mockProperties);
   const [showUpload, setShowUpload] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationMode, setConfirmationMode] = useState<"new" | "update">("new");
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -72,21 +77,52 @@ export default function Dashboard() {
     // TODO: Implement actual AI processing
     setTimeout(() => {
       setIsProcessing(false);
+      setConfirmationMode("new");
+      setSelectedPropertyId(undefined);
       setShowConfirmation(true);
       setShowUpload(false);
     }, 2000);
   };
 
-  const filteredProperties = mockProperties.filter((p) =>
+  const handleReupload = (propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId);
+    if (!property) return;
+
+    // Simulate file picker and AI re-processing
+    setIsProcessing(true);
+    setSelectedPropertyId(propertyId);
+    
+    setTimeout(() => {
+      setIsProcessing(false);
+      setConfirmationMode("update");
+      setShowConfirmation(true);
+      toast({
+        title: "Image processed",
+        description: "Review the updated information for " + property.buildingName,
+      });
+    }, 2000);
+  };
+
+  const handleDelete = (propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId);
+    setProperties(properties.filter(p => p.id !== propertyId));
+    
+    toast({
+      title: "Property deleted",
+      description: property ? `${property.buildingName} has been removed.` : "Property removed",
+    });
+  };
+
+  const filteredProperties = properties.filter((p) =>
     p.buildingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const urgentCount = mockProperties.filter(
+  const urgentCount = properties.filter(
     p => differenceInHours(p.demolitionDate, new Date()) <= 24 && differenceInHours(p.demolitionDate, new Date()) > 0
   ).length;
 
-  const upcomingCount = mockProperties.filter(
+  const upcomingCount = properties.filter(
     p => differenceInHours(p.demolitionDate, new Date()) > 24 && p.status !== 'completed'
   ).length;
 
@@ -124,7 +160,7 @@ export default function Dashboard() {
         </div>
 
         <QuickStats
-          totalProperties={mockProperties.length}
+          totalProperties={properties.length}
           urgent={urgentCount}
           upcoming={upcomingCount}
         />
@@ -147,7 +183,12 @@ export default function Dashboard() {
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {sortedProperties.map((property) => (
-              <PropertyCard key={property.id} {...property} />
+              <PropertyCard
+                key={property.id}
+                {...property}
+                onDelete={handleDelete}
+                onReupload={handleReupload}
+              />
             ))}
           </div>
 
@@ -162,8 +203,12 @@ export default function Dashboard() {
       <ConfirmationDialog
         open={showConfirmation}
         onClose={() => setShowConfirmation(false)}
+        mode={confirmationMode}
+        propertyId={selectedPropertyId}
         extractedData={{
-          propertyAddress: "Storage Silo - Owner: John Smith",
+          propertyAddress: confirmationMode === "update" 
+            ? properties.find(p => p.id === selectedPropertyId)?.buildingName + " - Owner: " + properties.find(p => p.id === selectedPropertyId)?.ownerName
+            : "Storage Silo - Owner: John Smith",
           demolitionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           extractedText: "MISSED PAYMENT NOTICE\n\nBuilding: Storage Silo\nOwner: John Smith\nDemolition: March 15, 2024 at 10:00 AM\n\nPlease pay taxes immediately.",
         }}

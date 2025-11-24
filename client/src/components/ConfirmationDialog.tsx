@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Sparkles } from "lucide-react";
+import { CalendarIcon, Sparkles, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 interface ExtractedData {
@@ -29,6 +29,8 @@ interface ConfirmationDialogProps {
   extractedData: ExtractedData;
   onConfirm?: (data: ExtractedData) => void;
   onReject?: () => void;
+  mode?: "new" | "update";
+  propertyId?: string;
 }
 
 export default function ConfirmationDialog({
@@ -37,6 +39,8 @@ export default function ConfirmationDialog({
   extractedData,
   onConfirm,
   onReject,
+  mode = "new",
+  propertyId,
 }: ConfirmationDialogProps) {
   const [address, setAddress] = useState(extractedData.propertyAddress);
   const [date, setDate] = useState<Date>(extractedData.demolitionDate);
@@ -48,7 +52,7 @@ export default function ConfirmationDialog({
       propertyAddress: address,
       demolitionDate: date,
     });
-    console.log('Confirmed demolition:', { address, date, notes });
+    console.log(mode === "update" ? 'Updated demolition:' : 'Confirmed demolition:', { address, date, notes, propertyId });
     onClose();
   };
 
@@ -63,11 +67,23 @@ export default function ConfirmationDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-confirmation">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Confirm Extracted Information
+            {mode === "update" ? (
+              <>
+                <RefreshCw className="h-5 w-5 text-primary" />
+                Update Property Information
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-5 w-5 text-primary" />
+                Confirm Extracted Information
+              </>
+            )}
           </DialogTitle>
           <DialogDescription>
-            Review and edit the AI-extracted demolition details before saving.
+            {mode === "update" 
+              ? "Review and update the demolition details for this property."
+              : "Review and edit the AI-extracted demolition details before saving."
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -84,18 +100,18 @@ export default function ConfirmationDialog({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="address">Property Address</Label>
+            <Label htmlFor="address">Property Details (Owner & Building)</Label>
             <Input
               id="address"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Enter property address"
+              placeholder="e.g., Storage Silo - Owner: John Smith"
               data-testid="input-address"
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Demolition Date</Label>
+            <Label>Demolition Date & Time</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -143,10 +159,10 @@ export default function ConfirmationDialog({
 
         <DialogFooter className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={handleReject} data-testid="button-reject">
-            Reject
+            Cancel
           </Button>
           <Button onClick={handleConfirm} data-testid="button-confirm">
-            Confirm & Save
+            {mode === "update" ? "Update Property" : "Confirm & Save"}
           </Button>
         </DialogFooter>
       </DialogContent>
