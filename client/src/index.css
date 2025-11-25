@@ -93,13 +93,13 @@
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(17, 24, 39, .04);
   --elevate-2: rgba(17, 24, 39, .10);
-  --background: 0 0% 98%;
+  --background: 210 40% 96%;
   --foreground: 217 33% 12%;
   --border: 217 33% 84%;
-  --card: 0 0% 100%;
+  --card: 210 40% 99%;
   --card-foreground: 217 33% 12%;
   --card-border: 217 33% 86%;
-  --sidebar: 217 33% 96%;
+  --sidebar: 210 40% 94%;
   --sidebar-foreground: 217 33% 12%;
   --sidebar-border: 217 33% 84%;
   --sidebar-primary: 217 91% 48%;
@@ -107,7 +107,7 @@
   --sidebar-accent: 217 50% 92%;
   --sidebar-accent-foreground: 217 33% 12%;
   --sidebar-ring: 217 91% 48%;
-  --popover: 0 0% 100%;
+  --popover: 210 40% 99%;
   --popover-foreground: 217 33% 12%;
   --popover-border: 217 33% 86%;
   --primary: 217 91% 48%;
