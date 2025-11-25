@@ -13,7 +13,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Building2, Clock, Navigation, AlertCircle, Trash2, Upload, MapPin } from "lucide-react";
-import { formatDistanceToNow, format, differenceInHours } from "date-fns";
+import { format, differenceInHours } from "date-fns";
+import { getExactTimeRemaining } from "@/lib/timeUtils";
 
 interface PropertyCardProps {
   id: string;
@@ -43,7 +44,7 @@ export default function PropertyCard({
   const isPast = demolitionDate < new Date();
   const hoursUntil = differenceInHours(demolitionDate, new Date());
   const isUrgent = hoursUntil <= 24 && hoursUntil > 0;
-  const timeUntil = isPast ? "OVERDUE" : formatDistanceToNow(demolitionDate, { addSuffix: true });
+  const timeUntil = getExactTimeRemaining(demolitionDate);
 
   const handleDelete = () => {
     onDelete?.(id);

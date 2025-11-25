@@ -7,7 +7,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Building2, Clock, MapPin, Calendar, AlertCircle } from "lucide-react";
-import { formatDistanceToNow, format, differenceInHours } from "date-fns";
+import { format, differenceInHours } from "date-fns";
+import { getExactTimeRemaining } from "@/lib/timeUtils";
 
 interface PropertyDetailDialogProps {
   open: boolean;
@@ -30,7 +31,7 @@ export default function PropertyDetailDialog({
   const isPast = property.demolitionDate < new Date();
   const hoursUntil = differenceInHours(property.demolitionDate, new Date());
   const isUrgent = hoursUntil <= 24 && hoursUntil > 0;
-  const timeUntil = isPast ? "OVERDUE" : formatDistanceToNow(property.demolitionDate, { addSuffix: true });
+  const timeUntil = getExactTimeRemaining(property.demolitionDate);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
