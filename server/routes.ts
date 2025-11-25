@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertDemolitionSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
-import { extractDemolitionInfo } from "./ocr";
+import { extractDemolitionInfo } from "./vision";
 import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 
