@@ -19,9 +19,10 @@ export type User = typeof users.$inferSelect;
 
 export const demolitions = pgTable("demolitions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  propertyAddress: text("property_address").notNull(),
+  ownerName: text("owner_name"),
+  buildingName: text("building_name").notNull(),
+  location: text("location"),
   demolitionDate: timestamp("demolition_date", { withTimezone: true }).notNull(),
-  status: text("status").notNull().default("pending"),
   imageUrl: text("image_url"),
   extractedText: text("extracted_text"),
   notes: text("notes"),

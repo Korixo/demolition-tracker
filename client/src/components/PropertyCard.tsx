@@ -12,15 +12,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Building2, Clock, Navigation, AlertCircle, Trash2, Upload } from "lucide-react";
+import { Building2, Clock, Navigation, AlertCircle, Trash2, Upload, MapPin } from "lucide-react";
 import { formatDistanceToNow, format, differenceInHours } from "date-fns";
 
 interface PropertyCardProps {
   id: string;
   ownerName?: string;
   buildingName: string;
+  location?: string;
   demolitionDate: Date;
-  status: "pending" | "confirmed" | "reminded" | "completed";
   imageUrl?: string;
   onNavigate?: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -31,8 +31,8 @@ export default function PropertyCard({
   id,
   ownerName,
   buildingName,
+  location,
   demolitionDate,
-  status,
   imageUrl,
   onNavigate,
   onDelete,
@@ -45,13 +45,6 @@ export default function PropertyCard({
   const isUrgent = hoursUntil <= 24 && hoursUntil > 0;
   const timeUntil = isPast ? "OVERDUE" : formatDistanceToNow(demolitionDate, { addSuffix: true });
 
-  const statusConfig = {
-    pending: { color: "bg-amber-500/20 text-amber-400 border-amber-500/30", label: "Pending" },
-    confirmed: { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", label: "Confirmed" },
-    reminded: { color: "bg-purple-500/20 text-purple-400 border-purple-500/30", label: "Reminded" },
-    completed: { color: "bg-green-500/20 text-green-400 border-green-500/30", label: "Completed" },
-  };
-
   const handleDelete = () => {
     onDelete?.(id);
     console.log('Deleted property:', id);
@@ -63,12 +56,17 @@ export default function PropertyCard({
     console.log('Re-upload image for property:', id);
   };
 
+  const handleNavigate = () => {
+    onNavigate?.(id);
+    console.log('Navigate to property:', id);
+  };
+
   return (
     <>
       <Card 
         className={`overflow-hidden hover-elevate transition-all ${
           isUrgent ? 'border-destructive/50 shadow-lg shadow-destructive/20 animate-pulse' : ''
-        } ${isPast && status !== 'completed' ? 'border-destructive' : ''}`}
+        } ${isPast ? 'border-destructive' : ''}`}
         data-testid={`card-property-${id}`}
       >
         <CardContent className="p-4 space-y-3">
@@ -94,9 +92,12 @@ export default function PropertyCard({
                 </div>
               )}
             </div>
-            <Badge className={statusConfig[status].color} data-testid={`badge-status-${id}`}>
-              {statusConfig[status].label}
-            </Badge>
+            {location && (
+              <Badge variant="outline" className="flex items-center gap-1" data-testid={`badge-location-${id}`}>
+                <MapPin className="h-3 w-3" />
+                {location}
+              </Badge>
+            )}
           </div>
 
           <div className="space-y-2 pt-2 border-t border-border/50">
@@ -121,10 +122,7 @@ export default function PropertyCard({
               <Button
                 className="flex-1"
                 variant={isPast ? "destructive" : "default"}
-                onClick={() => {
-                  onNavigate?.(id);
-                  console.log('Navigate to property:', id);
-                }}
+                onClick={handleNavigate}
                 data-testid={`button-navigate-${id}`}
               >
                 <Navigation className="h-4 w-4 mr-2" />

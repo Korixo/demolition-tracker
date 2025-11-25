@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import QuickStats from "@/components/QuickStats";
 import UploadZone from "@/components/UploadZone";
 import PropertyCard from "@/components/PropertyCard";
+import PropertyDetailDialog from "@/components/PropertyDetailDialog";
 import ConfirmationDialog from "@/components/ConfirmationDialog";
 import { differenceInHours } from "date-fns";
 
@@ -15,50 +16,53 @@ const mockProperties: Array<{
   id: string;
   ownerName: string;
   buildingName: string;
+  location: string;
   demolitionDate: Date;
-  status: "pending" | "confirmed" | "reminded" | "completed";
+  imageUrl?: string;
 }> = [
   {
     id: "1",
     ownerName: "Sarah Parker",
     buildingName: "Storage Silo",
+    location: "Dewstone Plains",
     demolitionDate: new Date(Date.now() + 2 * 60 * 60 * 1000),
-    status: "confirmed",
+    imageUrl: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=800",
   },
   {
     id: "2",
     ownerName: "Michael Chen",
     buildingName: "Trade Warehouse",
+    location: "Windscour Savannah",
     demolitionDate: new Date(Date.now() + 20 * 60 * 60 * 1000),
-    status: "reminded",
+    imageUrl: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800",
   },
   {
     id: "3",
     ownerName: "Emma Wilson",
     buildingName: "Farmhouse Estate",
+    location: "Marianople",
     demolitionDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    status: "pending",
   },
   {
     id: "4",
     ownerName: "James Rodriguez",
     buildingName: "Merchant Shop",
+    location: "Solzreed Peninsula",
     demolitionDate: new Date(Date.now() + 18 * 60 * 60 * 1000),
-    status: "confirmed",
   },
   {
     id: "5",
     ownerName: "Lisa Anderson",
     buildingName: "Crafting Hall",
+    location: "Tigerspine Mountains",
     demolitionDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
-    status: "pending",
   },
   {
     id: "6",
     ownerName: "David Kim",
     buildingName: "Auction House",
+    location: "Two Crowns",
     demolitionDate: new Date(Date.now() - 1 * 60 * 60 * 1000),
-    status: "reminded",
   },
 ];
 
@@ -67,6 +71,8 @@ export default function Dashboard() {
   const [properties, setProperties] = useState(mockProperties);
   const [showUpload, setShowUpload] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showPropertyDetail, setShowPropertyDetail] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<typeof mockProperties[0] | null>(null);
   const [confirmationMode, setConfirmationMode] = useState<"new" | "update">("new");
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -74,7 +80,7 @@ export default function Dashboard() {
 
   const handleUpload = (file: File) => {
     setIsProcessing(true);
-    // TODO: Implement actual AI processing
+    // TODO: Implement actual AI processing with OpenAI
     setTimeout(() => {
       setIsProcessing(false);
       setConfirmationMode("new");
@@ -103,6 +109,14 @@ export default function Dashboard() {
     }, 2000);
   };
 
+  const handleNavigate = (propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId);
+    if (property) {
+      setSelectedProperty(property);
+      setShowPropertyDetail(true);
+    }
+  };
+
   const handleDelete = (propertyId: string) => {
     const property = properties.find(p => p.id === propertyId);
     setProperties(properties.filter(p => p.id !== propertyId));
@@ -115,7 +129,8 @@ export default function Dashboard() {
 
   const filteredProperties = properties.filter((p) =>
     p.buildingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.ownerName.toLowerCase().includes(searchQuery.toLowerCase())
+    p.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const urgentCount = properties.filter(
@@ -123,7 +138,7 @@ export default function Dashboard() {
   ).length;
 
   const upcomingCount = properties.filter(
-    p => differenceInHours(p.demolitionDate, new Date()) > 24 && p.status !== 'completed'
+    p => differenceInHours(p.demolitionDate, new Date()) > 24
   ).length;
 
   // Sort: urgent first, then by date
@@ -173,7 +188,7 @@ export default function Dashboard() {
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by building or owner..."
+              placeholder="Search by building, owner, or location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -186,6 +201,7 @@ export default function Dashboard() {
               <PropertyCard
                 key={property.id}
                 {...property}
+                onNavigate={handleNavigate}
                 onDelete={handleDelete}
                 onReupload={handleReupload}
               />
@@ -213,6 +229,17 @@ export default function Dashboard() {
           extractedText: "MISSED PAYMENT NOTICE\n\nBuilding: Storage Silo\nOwner: John Smith\nDemolition: March 15, 2024 at 10:00 AM\n\nPlease pay taxes immediately.",
         }}
       />
+
+      {selectedProperty && (
+        <PropertyDetailDialog
+          open={showPropertyDetail}
+          onClose={() => {
+            setShowPropertyDetail(false);
+            setSelectedProperty(null);
+          }}
+          property={selectedProperty}
+        />
+      )}
     </div>
   );
 }
