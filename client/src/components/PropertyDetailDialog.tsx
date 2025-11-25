@@ -15,11 +15,11 @@ interface PropertyDetailDialogProps {
   onClose: () => void;
   property: {
     id: string;
-    ownerName?: string;
+    ownerName: string | null;
     buildingName: string;
-    demolitionDate: Date;
-    location?: string;
-    imageUrl?: string;
+    demolitionDate: Date | string;
+    location: string | null;
+    imageUrl: string | null;
   };
 }
 
@@ -28,10 +28,14 @@ export default function PropertyDetailDialog({
   onClose,
   property,
 }: PropertyDetailDialogProps) {
-  const isPast = property.demolitionDate < new Date();
-  const hoursUntil = differenceInHours(property.demolitionDate, new Date());
+  const demolitionDate = typeof property.demolitionDate === 'string' 
+    ? new Date(property.demolitionDate) 
+    : property.demolitionDate;
+  
+  const isPast = demolitionDate < new Date();
+  const hoursUntil = differenceInHours(demolitionDate, new Date());
   const isUrgent = hoursUntil <= 24 && hoursUntil > 0;
-  const timeUntil = getExactTimeRemaining(property.demolitionDate);
+  const timeUntil = getExactTimeRemaining(demolitionDate);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -91,7 +95,7 @@ export default function PropertyDetailDialog({
                 <span>Demolition Date</span>
               </div>
               <p className="text-lg font-semibold font-mono" data-testid={`text-demo-date-${property.id}`}>
-                {format(property.demolitionDate, "PPP 'at' HH:mm")}
+                {format(demolitionDate, "PPP 'at' HH:mm")}
               </p>
             </div>
 
