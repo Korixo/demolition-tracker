@@ -4,7 +4,9 @@ import { storage } from "./storage";
 import { insertDemolitionSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
-import { extractDemolitionInfo } from "./openai";
+import { extractDemolitionInfo } from "./ocr";
+import { writeFileSync, unlinkSync } from "fs";
+import { join } from "path";
 
 // Configure multer for memory storage
 const upload = multer({
@@ -24,6 +26,7 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Upload and extract demolition info from image
   app.post("/api/upload-image", upload.single('image'), async (req, res) => {
+    let tempFilePath: string | null = null;
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No image file provided" });
@@ -35,8 +38,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store image as data URL for now (in production, use object storage)
       const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
 
-      // Extract demolition info using OpenAI
-      const extractedData = await extractDemolitionInfo(base64Image);
+      // Save image temporarily for Tesseract OCR
+      tempFilePath = join("/tmp", `ocr_${Date.now()}_${req.file.originalname}`);
+      writeFileSync(tempFilePath, req.file.buffer);
+
+      // Extract demolition info using Tesseract OCR (free!)
+      const extractedData = await extractDemolitionInfo(tempFilePath);
 
       res.json({
         imageUrl,
@@ -48,6 +55,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: "Failed to process image", 
         details: error instanceof Error ? error.message : "Unknown error"
       });
+    } finally {
+      // Clean up temporary file
+      if (tempFilePath) {
+        try {
+          unlinkSync(tempFilePath);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
   });
 
