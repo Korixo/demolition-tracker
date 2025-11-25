@@ -33,7 +33,7 @@ function parseDateFromText(text: string): string {
         } else {
           // Ambiguous, try MM-DD-YYYY first, fallback to DD.MM.YYYY
           const asMMDD = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-          const asDD MM = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          const asDDMM = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
           date = asMMDD;
         }
       } else {
@@ -95,19 +95,20 @@ export async function extractDemolitionInfo(
     const imageBuffer = fs.readFileSync(imagePath);
     const base64Image = imageBuffer.toString("base64");
 
-    // Call Google Cloud Vision API
+    // Call Google Cloud Vision API with proper typing
     const request = {
       image: {
         content: base64Image,
       },
       features: [
         {
-          type: "TEXT_DETECTION",
+          type: "TEXT_DETECTION" as const,
         },
       ],
     };
 
-    const [result] = await client.batchAnnotateImages({ requests: [request] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [result] = await (client.batchAnnotateImages as any)({ requests: [request] });
     const annotations = result.responses[0];
 
     if (!annotations.fullTextAnnotation) {
