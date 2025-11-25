@@ -32,12 +32,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No image file provided" });
       }
 
-      // Convert buffer to base64
-      const base64Image = req.file.buffer.toString('base64');
-      
-      // Store image as data URL for now (in production, use object storage)
-      const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
-
       // Save image temporarily for Tesseract OCR
       tempFilePath = join("/tmp", `ocr_${Date.now()}_${req.file.originalname}`);
       writeFileSync(tempFilePath, req.file.buffer);
@@ -45,8 +39,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract demolition info using Tesseract OCR (free!)
       const extractedData = await extractDemolitionInfo(tempFilePath);
 
+      // Return only extracted data (not the base64 image to avoid payload issues)
       res.json({
-        imageUrl,
         extractedData,
       });
     } catch (error) {

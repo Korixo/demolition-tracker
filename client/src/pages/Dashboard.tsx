@@ -103,7 +103,6 @@ export default function Dashboard() {
       const payload = {
         buildingName: data.propertyAddress,
         demolitionDate: data.demolitionDate.toISOString(),
-        imageUrl: extractedData?.imageUrl,
         extractedText: extractedData?.extractedData?.extractedText,
       };
 

@@ -55,16 +55,6 @@ export default function PropertyDetailDialog({
             </div>
           )}
 
-          {property.imageUrl && (
-            <div className="rounded-lg border overflow-hidden bg-muted">
-              <img
-                src={property.imageUrl}
-                alt={`Demolition notice for ${property.buildingName}`}
-                className="w-full h-auto"
-                data-testid={`img-property-${property.id}`}
-              />
-            </div>
-          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
